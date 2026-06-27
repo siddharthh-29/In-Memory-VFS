@@ -1,40 +1,34 @@
-# 🚀 In-Memory Virtual File System (VFS)
+# 🚀 Thread-Safe In-Memory Virtual File System (VFS)
 
-A lightweight, POSIX-style in-memory file system implemented entirely in standard C++. This project simulates core operating system functionalities, including directory navigation, file manipulation, and dynamic path parsing, using a custom-built N-ary tree data structure.
+A high-performance, thread-safe in-memory file system implemented in **C++17**. This project simulates core operating system functionalities and is engineered to handle high-concurrency environments by implementing a **Readers-Writer Lock** synchronization pattern.
 
 ## 🧠 Core Architecture & System Design
 
-This VFS is designed using the **Composite Design Pattern** to treat files and directories uniformly, ensuring highly modular and scalable code.
+This VFS is designed using the **Composite Design Pattern** to treat files and directories uniformly.
 
-* **N-ary Tree Structure:** Directories map to string keys using `std::unordered_map` for **O(1) average time complexity** when searching for child nodes.
-* **Manual Memory Management:** Since the system relies heavily on raw pointers to simulate disk blocks, the `Directory` class implements custom destructors to perform **recursive memory deallocation**, guaranteeing zero memory leaks during tree teardown (e.g., when running `rm` on a populated directory).
-* **Polymorphism:** A base `FileSystemNode` class abstracts the common properties (creation time, name, permissions) while `File` and `Directory` inherit and implement their specific behaviors.
+* **Concurrency Architecture:** Implemented a **Readers-Writer Lock pattern** using `std::shared_mutex`. This architecture maximizes throughput by allowing multiple threads to execute read-only operations (`ls`, `cat`, `pwd`) simultaneously, while ensuring exclusive write access (`mkdir`, `touch`, `rm`) to maintain data integrity.
+* **N-ary Tree Structure:** Directories map to string keys using `std::unordered_map` for **O(1)** average time complexity for lookups.
+* **Manual Memory Management:** The system utilizes raw pointers to simulate disk blocks, with custom recursive destructors ensuring **zero memory leaks** even when tearing down complex, nested directory structures.
 
 ## ⚙️ Features
 
-The interactive shell supports the following core system commands:
-
-* `pwd` - Print the current working directory.
-* `ls` - List the contents of the current directory.
-* `mkdir <dir_name>` - Create a new directory.
-* `touch <file_name>` - Create a new empty file.
-* `write <file_name> <text>` - Write string data to a file.
-* `cat <file_name>` - Output the contents of a file to the shell.
-* `cd <path>` - Navigate the file system (supports relative paths like `..` and `/`).
-* `rm <target>` - Recursively delete a file or directory, freeing allocated heap memory.
+* **Thread-Safe API:** All operations are protected by granular locks to prevent race conditions.
+* **Navigation & Manipulation:** Supports `mkdir`, `cd`, `touch`, `ls`, and `pwd`.
+* **File I/O:** Supports `write` (file content injection) and `cat` (read).
+* **Recursive Deletion:** `rm` command ensures all child nodes are deallocated from heap memory.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-* A C++ compiler (`g++`, `clang`, or MSVC)
-* No external libraries or dependencies are required. It uses the C++ Standard Library natively.
+* A C++17 compatible compiler (`g++`, `clang`, or MSVC).
+* No external dependencies required.
 
 ### Compilation & Execution
-Clone the repository and compile using `g++`:
+Compile with C++17 standards to enable `std::shared_mutex`:
 
 ```bash
 # Compile the source code
-g++ main.cpp -o vfs
+g++ -std=c++17 k.cpp -o vfs
 
-# Run the interactive shell
+# Run the concurrency stress test
 ./vfs
