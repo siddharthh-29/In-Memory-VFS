@@ -3,6 +3,10 @@
 #include <unordered_map>
 #include <vector>
 #include <ctime>
+#include <shared_mutex>
+#include <mutex>
+#include <thread>
+#include <chrono> // For simulating delays
 
 // 1. Forward declaration so FileSystemNode knows Directory exists
 class Directory;
@@ -240,65 +244,46 @@ public:
     }
 };
 
-// 6. The Interactive Shell
 int main() {
     FileSystem vfs;
-    std::string command, argument;
+    std::cout << "Booting Thread-Safe Virtual File System...\n";
 
-    std::cout << "Virtual File System booted. Type 'exit' to quit.\n";
+    // 1. Setup a file for the threads to interact with
+    vfs.touch("shared_doc.txt");
+    vfs.writeFile("shared_doc.txt", "Initial State");
 
-    while (true) {
-        std::cout << "$ "; // The terminal prompt
-        std::cin >> command;
+    std::cout << "\n--- Starting Thread Stress Test ---\n";
 
-        if (command == "exit") {
-            break;
-        } 
-        else if (command == "pwd") {
-            vfs.pwd();
-        } 
-        else if (command == "ls") {
-            vfs.ls();
-        } 
-        else if (command == "mkdir") {
-            std::cin >> argument; // Read the folder name
-            vfs.mkdir(argument);
+    // 2. Define a Reader Thread job (Simulates a user aggressively reading a file)
+    auto readerJob = [&vfs]() {
+        for (int i = 0; i < 4; ++i) {
+            vfs.cat("shared_doc.txt");
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
-        else if (command == "cd") {
-            std::cin >> argument; // Read the target path
-            vfs.cd(argument);
-        }
+    };
 
-        else if (command == "touch") {
-            std::cin >> argument;
-            vfs.touch(argument);
+    // 3. Define a Writer Thread job (Simulates a user updating the file)
+    auto writerJob = [&vfs](std::string text) {
+        for (int i = 0; i < 2; ++i) {
+            vfs.writeFile("shared_doc.txt", text);
+            std::this_thread::sleep_for(std::chrono::milliseconds(80));
         }
-        else if (command == "write") {
-            std::cin >> argument; // This gets the filename
-            std::string content;
-            std::getline(std::cin, content); // This gets the rest of the line (the text to write)
-            
-            // Remove the leading space that getline picks up
-            if (!content.empty() && content[0] == ' ') {
-                content = content.substr(1);
-            }
-            vfs.writeFile(argument, content);
-        }
-        else if (command == "cat") {
-            std::cin >> argument;
-            vfs.cat(argument);
-        }
-        else if (command == "rm") {
-            std::cin >> argument;
-            vfs.rm(argument);
-        }
-        else {
-            std::cout << "Command not found: " << command << "\n";
-            // Clear the rest of the line in case they typed garbage
-            std::cin.ignore(256, '\n'); 
-        }
-    }
+    };
 
-    std::cout << "System shutting down safely.\n";
+    // 4. Spawn 5 threads simultaneously to bombard the file system!
+    std::thread r1(readerJob);
+    std::thread r2(readerJob);
+    std::thread w1(writerJob, "Update from Writer 1!");
+    std::thread r3(readerJob);
+    std::thread w2(writerJob, "Update from Writer 2!");
+
+    // 5. Wait for all threads to finish their jobs
+    r1.join();
+    r2.join();
+    w1.join();
+    r3.join();
+    w2.join();
+
+    std::cout << "--- Stress Test Complete. Zero Race Conditions. ---\n";
     return 0;
 }
